@@ -42,15 +42,21 @@ public:
 private:
     // LRU cache node
     using lru_node = struct lru_node {
+        lru_node(const std::string &key_arg, const std::string &value_arg, lru_node *prev_arg = nullptr);
+
         std::string key;
         std::string value;
-        std::unique_ptr<lru_node> prev;
+        lru_node *prev;
         std::unique_ptr<lru_node> next;
     };
 
     // Maximum number of bytes could be stored in this cache.
     // i.e all (keys+values) must be less the _max_size
     std::size_t _max_size;
+
+    // Actual number of bytes stored in this cache
+    // Always less than _max_size
+    std::size_t _actual_size;
 
     // Main storage of lru_nodes, elements in this list ordered descending by "freshness": in the head
     // element that wasn't used for longest time.
@@ -59,7 +65,13 @@ private:
     std::unique_ptr<lru_node> _lru_head;
 
     // Index of nodes from list above, allows fast random access to elements by lru_node#key
-    std::map<std::reference_wrapper<std::string>, std::reference_wrapper<lru_node>, std::less<std::string>> _lru_index;
+    std::map<const std::reference_wrapper<const std::string>,
+             const std::reference_wrapper<lru_node>> _lru_index;
+
+    void FreeSpaceForNewItem (std::size_t additional_size);
+    void RemoveOldestItem();
+    bool PutItem(const std::string &key, const std::string &value);
+    lru_node *StorageSearch(const std::string &key);
 };
 
 } // namespace Backend
