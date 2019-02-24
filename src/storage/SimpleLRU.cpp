@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <iostream>
 #include "SimpleLRU.h"
 
 namespace Afina {
@@ -86,7 +87,7 @@ bool SimpleLRU::Get(const std::string &key, std::string &value) const {
   }
   _lru_history.push_front(item->first);
 
-  std::copy(item->second.begin(), item->second.end(), value.begin());
+  value.assign(item->second);
   return true;
 }
 
