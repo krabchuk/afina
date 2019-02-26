@@ -109,6 +109,7 @@ bool SimpleLRU::Set(const std::string &key, const std::string &value) {
   _lru_storage.erase(key);
   _lru_storage.insert(std::make_pair(key, value));
   _lru_history->push_front(_lru_storage.find(key)->first);
+  return true;
 }
 
 // See MapBasedGlobalLockImpl.h
