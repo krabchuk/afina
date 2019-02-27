@@ -79,10 +79,8 @@ private:
       void erase(const std::string &key);
       const std::string &back() const { return _tail->_key; }
       const std::string &front() const { return _head->_key; }
-      lru_node &head() const { return *_head; }
+      const lru_node &head() const { return *_head; }
       void update(const std::string &key, const std::string &value);
-
-      void print();
 
       lru_node *find(lru_node *first, const std::string &key) const;
     };
@@ -97,7 +95,7 @@ private:
 
     // Main data storage
     std::unordered_map<std::reference_wrapper<const std::string>,
-                       std::reference_wrapper<lru_deque::lru_node>,
+                       std::reference_wrapper<const lru_deque::lru_node>,
                        std::hash<std::string>,
                        std::equal_to<const std::string>> _lru_storage;
 

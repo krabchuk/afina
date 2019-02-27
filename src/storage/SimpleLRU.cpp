@@ -60,20 +60,6 @@ void SimpleLRU::lru_deque::erase(const std::string &key) {
   }
 }
 
-void SimpleLRU::lru_deque::print() {
-  auto curr = _head.get();
-  while (curr) {
-    std::cout << "|" << curr->_key << "| : |" << curr->_value << "|" << std::endl;
-    curr = curr->_next.get();
-    if (curr && curr->_prev->_next->_key != curr->_key)
-      throw std::runtime_error("Error");
-  }
-  curr = _tail;
-  if (curr)
-    std::cout << "TAIL = |" << curr->_key << "| : |" << curr->_value << "|" << std::endl;
-  std::cout << "-----------------------------------------" << std::endl;
-}
-
 void SimpleLRU::lru_deque::update(const std::string &key, const std::string &value) {
   if (_head->_key == key)
     return;
