@@ -18,13 +18,17 @@ namespace Backend {
  */
 class SimpleLRU : public Afina::Storage {
 public:
-    SimpleLRU(size_t max_size = 1024) : _max_size(max_size) {
-      _lru_history.reset(new lru_deque ());
-    }
+    SimpleLRU(size_t max_size = 1024) : _max_size(max_size) {}
 
     ~SimpleLRU() {
-        _lru_history.reset();
-        _lru_storage.clear();
+        _lru_index.clear();
+        if (_lru_head) {
+          while (_lru_tail->_prev) {
+            _lru_tail->_prev->_next.reset();
+            _lru_tail = _lru_tail->_prev;
+          }
+          _lru_head.reset();
+        }
     }
 
     // Implements Afina::Storage interface
@@ -43,67 +47,37 @@ public:
     bool Get(const std::string &key, std::string &value) const override;
 
 private:
-    struct lru_deque {
-      struct lru_node {
-        lru_node *_prev = nullptr;
-        std::unique_ptr<lru_node> _next;
+  struct lru_node {
+    lru_node *_prev = nullptr;
+    std::unique_ptr<lru_node> _next;
 
-        std::string _key;
-        std::string _value;
+    const std::string _key;
+    std::string _value;
 
-        lru_node(const std::string &key, const std::string &value) {
-          _key = key;
-          _value = value;
-          _prev = nullptr;
-        }
-        lru_node(const lru_node &node) {}
-        ~lru_node() {}
-      };
+    lru_node(const std::string &key, const std::string &value) : _key (key), _value (value) {}
+  };
 
-      ~lru_deque() {
-        if (_head) {
-          while (_tail->_prev) {
-            _tail = _tail->_prev;
-            _tail->_next.reset();
-          }
-          _head.reset();
-        }
+  // Maximum number of bytes could be stored in this cache.
+  // i.e all (keys+values) must be less the _max_size
+  std::size_t _max_size;
 
-      }
+  // Actual number of bytes stored in this cache
+  // Always less than _max_size
+  std::size_t _actual_size = 0;
 
-      std::unique_ptr<lru_node> _head;
-      lru_node *_tail = nullptr;
+  // Main data index for fast search
+  std::unordered_map<std::reference_wrapper<const std::string>,
+                     std::reference_wrapper<lru_node>,
+                     std::hash<std::string>,
+                     std::equal_to<const std::string>> _lru_index;
 
-      void pop_back();
-      void push_front(const std::string &key, const std::string &value);
-      void erase(const std::string &key);
-      const std::string &back() const { return _tail->_key; }
-      const std::string &front() const { return _head->_key; }
-      const lru_node &head() const { return *_head; }
-      void update(const std::string &key, const std::string &value);
+  // Data storage.
+  // New elements go to head
+  mutable std::unique_ptr<lru_node> _lru_head;
+  mutable lru_node *_lru_tail;
 
-      lru_node *find(lru_node *first, const std::string &key) const;
-    };
-
-    // Maximum number of bytes could be stored in this cache.
-    // i.e all (keys+values) must be less the _max_size
-    std::size_t _max_size;
-
-    // Actual number of bytes stored in this cache
-    // Always less than _max_size
-    std::size_t _actual_size = 0;
-
-    // Main data storage
-    std::unordered_map<std::reference_wrapper<const std::string>,
-                       std::reference_wrapper<const lru_deque::lru_node>,
-                       std::hash<std::string>,
-                       std::equal_to<const std::string>> _lru_storage;
-
-    // Usage history storage.
-    // New elements go to head
-    std::unique_ptr<lru_deque> _lru_history;
-
-    bool PutItem(const std::string &key, const std::string &value);
+  bool PutItem(const std::string &key, const std::string &value);
+  void PopBack();
 };
 
 } // namespace Backend
