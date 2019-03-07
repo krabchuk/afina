@@ -105,7 +105,7 @@ bool SimpleLRU::Get(const std::string &key, std::string &value) const {
   auto &curr = item->second.get()._prev ? item->second.get()._prev->_next : _lru_head;
   value.assign(curr->_value);
 
-  if (!curr->_prev) {
+  if (curr->_prev) {
     if (curr->_next) {
       std::unique_ptr<lru_node> tmp = std::move(curr->_next);
       tmp->_prev = curr->_prev;

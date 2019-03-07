@@ -24,8 +24,8 @@ public:
         _lru_index.clear();
         if (_lru_head) {
           while (_lru_tail->_prev) {
-            _lru_tail->_prev->_next.reset();
             _lru_tail = _lru_tail->_prev;
+            _lru_tail->_next.reset();
           }
           _lru_head.reset();
         }
