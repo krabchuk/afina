@@ -77,7 +77,6 @@ private:
   mutable lru_node *_lru_tail;
 
   bool PutItem(const std::string &key, const std::string &value);
-  void PopBack();
 };
 
 } // namespace Backend

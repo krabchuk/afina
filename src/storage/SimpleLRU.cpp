@@ -6,17 +6,6 @@
 namespace Afina {
 namespace Backend {
 
-void SimpleLRU::PopBack() {
-  lru_node *_tail_prev = _lru_tail->_prev;
-  if (_tail_prev) {
-    _lru_tail->_prev->_next.reset();
-  }
-  else {
-    _lru_head.reset();
-  }
-  _lru_tail = _tail_prev;
-}
-
 bool SimpleLRU::PutItem(const std::string &key, const std::string &value) {
   std::size_t additional_size = key.size() + value.size();
   if (additional_size > _max_size)
@@ -97,7 +86,14 @@ bool SimpleLRU::Delete(const std::string &key) {
     }
   }
   else {
-    PopBack();
+    lru_node *_tail_prev = _lru_tail->_prev;
+    if (_tail_prev) {
+      _lru_tail->_prev->_next.reset();
+    }
+    else {
+      _lru_head.reset();
+    }
+    _lru_tail = _tail_prev;
   }
 
   _lru_index.erase(item);
