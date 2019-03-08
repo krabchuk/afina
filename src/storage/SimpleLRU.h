@@ -14,7 +14,7 @@ namespace Backend {
 
 /**
  * # Map based implementation
- * That is NOT thread safe implementaiton!!
+ * That is NOT thread safe implementation!!
  */
 class SimpleLRU : public Afina::Storage {
 public:
