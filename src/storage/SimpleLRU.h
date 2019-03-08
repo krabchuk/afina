@@ -18,9 +18,9 @@ namespace Backend {
  */
 class SimpleLRU : public Afina::Storage {
 public:
-    SimpleLRU(size_t max_size = 1024) : _max_size(max_size) {}
+    explicit SimpleLRU(size_t max_size = 1024) : _max_size(max_size) {}
 
-    ~SimpleLRU() {
+    ~SimpleLRU() override {
         _lru_index.clear();
         if (_lru_head) {
           while (_lru_tail->_prev) {
@@ -74,7 +74,7 @@ private:
   // Data storage.
   // New elements go to head
   mutable std::unique_ptr<lru_node> _lru_head;
-  mutable lru_node *_lru_tail;
+  mutable lru_node *_lru_tail = nullptr;
 
   bool PutItem(const std::string &key, const std::string &value);
 };
