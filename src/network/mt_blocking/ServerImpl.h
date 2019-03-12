@@ -54,14 +54,14 @@ private:
     // Thread to run network on
     std::thread _thread;
 
-    std::vector<std::thread> _workers;
+    unsigned int _workers_size = 0;
     int _workers_max_size;
 
     std::mutex _mutex_workers;
 
     std::condition_variable _cv_workers;
 
-    void ExecuteWork(int client_socket, std::vector<std::thread>::iterator it);
+    void ExecuteWork(int client_socket);
 };
 
 } // namespace MTblocking

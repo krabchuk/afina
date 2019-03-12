@@ -136,7 +136,7 @@ void ServerImpl::OnRun() {
 
         {
             std::lock_guard<std::mutex> _lock (_mutex_workers);
-            if (_workers.size() >= _workers_max_size) {
+            if (_workers_size >= _workers_max_size) {
                 static const std::string msg = "Achieved max number of workers";
                 if (send(client_socket, msg.data(), msg.size(), 0) <= 0) {
                     _logger->error("Failed to write response to client: {}", strerror(errno));
@@ -144,7 +144,9 @@ void ServerImpl::OnRun() {
                 close(client_socket);
             }
             else {
-                _workers.emplace_back(&ServerImpl::ExecuteWork, this, client_socket, _workers.end());
+                _workers_size++;
+                std::thread tmp (&ServerImpl::ExecuteWork, this, client_socket);
+                tmp.detach();
             }
 
         }
@@ -153,14 +155,14 @@ void ServerImpl::OnRun() {
 
     {
         std::unique_lock<std::mutex> _lock (_mutex_workers);
-        _cv_workers.wait(_lock, [this] () { return _workers.empty(); });
+        _cv_workers.wait(_lock, [this] () { return _workers_size == 0; });
     }
 
     // Cleanup on exit...
     _logger->warn("Network stopped");
 }
 
-void ServerImpl::ExecuteWork(int client_socket, std::vector<std::thread>::iterator it) {
+void ServerImpl::ExecuteWork(int client_socket) {
 
     std::size_t arg_remains;
     Protocol::Parser parser;
@@ -247,9 +249,8 @@ void ServerImpl::ExecuteWork(int client_socket, std::vector<std::thread>::iterat
     close(client_socket);
 
     std::lock_guard<std::mutex> _lock (_mutex_workers);
-    it->detach ();
-    _workers.erase(it);
-    if (_workers.empty() && !running.load())
+    _workers_size--;
+    if (_workers_size == 0 && !running.load())
         _cv_workers.notify_all();
 }
 
