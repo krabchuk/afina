@@ -8,6 +8,7 @@
 #include <queue>
 #include <string>
 #include <thread>
+#include <atomic>
 
 namespace Afina {
 namespace Concurrency {
@@ -28,8 +29,15 @@ class Executor {
         kStopped
     };
 
-    Executor(std::string name, int size);
-    ~Executor();
+    Executor () {};
+    ~Executor() {};
+
+    Executor (unsigned int low_watermark, unsigned int high_watermark, unsigned int max_queue_size, size_t idle_time);
+
+    /**
+     * Start _low_watermark threads and wait for jobs
+     */
+    void Start ();
 
     /**
      * Signal thread pool to stop, it will stop accepting new jobs and close threads just after each become
@@ -47,16 +55,33 @@ class Executor {
      * execution finished by itself
      */
     template <typename F, typename... Types> bool Execute(F &&func, Types... args) {
+
         // Prepare "task"
         auto exec = std::bind(std::forward<F>(func), std::forward<Types>(args)...);
 
-        std::unique_lock<std::mutex> lock(this->mutex);
+        std::unique_lock<std::mutex> lock(mutex);
         if (state != State::kRun) {
             return false;
         }
 
         // Enqueue new task
+        if (tasks.size() >= _max_queue_size) {
+            return false;
+        }
         tasks.push_back(exec);
+
+        // Release work to threads
+        if (_n_free_workers == 0 && _n_existing_workers == _high_watermark) {
+            return false;
+        }
+
+        if (_n_free_workers == 0) {
+            _n_free_workers++;
+            _n_existing_workers++;
+            threads.emplace_back(perform, this);
+            return true;
+        }
+
         empty_condition.notify_one();
         return true;
     }
@@ -84,7 +109,7 @@ private:
     std::condition_variable empty_condition;
 
     /**
-     * Vector of actual threads that perorm execution
+     * Vector of actual threads that perform execution
      */
     std::vector<std::thread> threads;
 
@@ -96,7 +121,17 @@ private:
     /**
      * Flag to stop bg threads
      */
-    State state;
+    State state = State::kStopped;
+
+    unsigned int _low_watermark = 0;
+    unsigned int _high_watermark = 0;
+    unsigned int _max_queue_size = 0;
+    size_t _idle_time = 0;
+
+    unsigned int _n_existing_workers = 0;
+    unsigned int _n_free_workers = 0;
+
+    std::condition_variable free_workers_condition;
 };
 
 } // namespace Concurrency
