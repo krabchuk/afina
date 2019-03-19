@@ -20,6 +20,7 @@ void perform (Executor *executor);
  * # Thread pool
  */
 class Executor {
+public:
     enum class State {
         // Threadpool is fully operational, tasks could be added and get executed
         kRun,

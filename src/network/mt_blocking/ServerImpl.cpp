@@ -37,6 +37,8 @@ ServerImpl::~ServerImpl() {}
 void ServerImpl::Start(uint16_t port, uint32_t n_accept, uint32_t n_workers) {
     _logger = pLogging->select("network");
     _logger->info("Start mt_blocking network service");
+    _logger->info ("Start executor");
+    executor.Start ();
 
     _workers_max_size = n_workers;
 
@@ -80,6 +82,7 @@ void ServerImpl::Start(uint16_t port, uint32_t n_accept, uint32_t n_workers) {
 
 // See Server.h
 void ServerImpl::Stop() {
+    executor.Stop ();
     running.store(false);
     shutdown(_server_socket, SHUT_RDWR);
 }
@@ -134,30 +137,14 @@ void ServerImpl::OnRun() {
             setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof tv);
         }
 
-        {
-            std::lock_guard<std::mutex> _lock (_mutex_workers);
-            if (_workers_size >= _workers_max_size) {
-                static const std::string msg = "Achieved max number of workers";
-                if (send(client_socket, msg.data(), msg.size(), 0) <= 0) {
-                    _logger->error("Failed to write response to client: {}", strerror(errno));
-                }
-                close(client_socket);
-            }
-            else {
-                _workers_size++;
-                std::thread tmp (&ServerImpl::ExecuteWork, this, client_socket);
-                tmp.detach();
-            }
 
+        if (!executor.Execute (&ServerImpl::ExecuteWork, this, client_socket)) {
+            static const std::string msg = "Server too busy";
+            if (send(client_socket, msg.data(), msg.size(), 0) <= 0) {
+                _logger->error ("Failed to write response to client: {}", strerror (errno));
+            }
         }
-
     }
-
-    {
-        std::unique_lock<std::mutex> _lock (_mutex_workers);
-        _cv_workers.wait(_lock, [this] () { return _workers_size == 0; });
-    }
-
     // Cleanup on exit...
     _logger->warn("Network stopped");
 }

@@ -23,6 +23,8 @@
 #include "storage/SimpleLRU.h"
 #include "storage/ThreadSafeSimpleLRU.h"
 
+#include <afina/concurrency/Executor.h>
+
 using namespace Afina;
 
 /**

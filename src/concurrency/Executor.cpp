@@ -25,6 +25,7 @@ void Executor::Start() {
 void Executor::Stop (bool await) {
   std::unique_lock<std::mutex> lock (mutex);
   state = State::kStopping;
+  empty_condition.notify_all ();
   stop_condition.wait (lock, [this] () { return _n_existing_workers == 0; });
   state = State ::kStopped;
 }

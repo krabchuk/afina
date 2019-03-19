@@ -6,6 +6,7 @@
 #include <condition_variable>
 
 #include <afina/network/Server.h>
+#include <afina/concurrency/Executor.h>
 
 namespace spdlog {
 class logger;
@@ -60,6 +61,8 @@ private:
     std::mutex _mutex_workers;
 
     std::condition_variable _cv_workers;
+
+    Afina::Concurrency::Executor executor;
 
     void ExecuteWork(int client_socket);
 };
