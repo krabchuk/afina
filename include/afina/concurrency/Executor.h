@@ -13,6 +13,9 @@
 namespace Afina {
 namespace Concurrency {
 
+class Executor;
+void perform (Executor *executor);
+
 /**
  * # Thread pool
  */
@@ -76,10 +79,9 @@ class Executor {
         }
 
         if (_n_free_workers == 0) {
-            _n_free_workers++;
             _n_existing_workers++;
-            threads.emplace_back(perform, this);
-            return true;
+            std::thread tmp (perform, this);
+            tmp.detach ();
         }
 
         empty_condition.notify_one();
@@ -107,11 +109,7 @@ private:
      * Conditional variable to await new data in case of empty queue
      */
     std::condition_variable empty_condition;
-
-    /**
-     * Vector of actual threads that perform execution
-     */
-    std::vector<std::thread> threads;
+    std::condition_variable stop_condition;
 
     /**
      * Task queue
@@ -130,8 +128,6 @@ private:
 
     unsigned int _n_existing_workers = 0;
     unsigned int _n_free_workers = 0;
-
-    std::condition_variable free_workers_condition;
 };
 
 } // namespace Concurrency

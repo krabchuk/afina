@@ -14,18 +14,49 @@ Executor::Executor(unsigned int low_watermark,
 }
 
 void Executor::Start() {
-  for (unsigned int worker_id = 0; worker_id < _low_watermark; ++worker_id)
-    threads.emplace_back(perform, this);
+  for (unsigned int worker_id = 0; worker_id < _low_watermark; ++worker_id) {
+    std::thread tmp (perform, this);
+    tmp.detach ();
+  }
   _n_existing_workers = _low_watermark;
-  _n_free_workers = _low_watermark;
+  _n_free_workers = 0;
+}
+
+void Executor::Stop (bool await) {
+  std::unique_lock<std::mutex> lock (mutex);
+  state = State::kStopping;
+  stop_condition.wait (lock, [this] () { return _n_existing_workers == 0; });
+  state = State ::kStopped;
 }
 
 void perform(Afina::Concurrency::Executor *executor) {
-  for (;;) {
-    std::unique_lock<std::mutex> lock (executor->mutex);
-
-    executor->empty_condition.wait_until()
+  while (executor->state == Executor::State::kRun) {
+    std::function<void()> task;
+    {
+      std::unique_lock<std::mutex> lock (executor->mutex);
+      while (executor->state == Executor::State ::kRun && executor->tasks.empty ()) {
+          executor->_n_free_workers++;
+          if (executor->empty_condition.wait_for (lock, std::chrono::milliseconds(executor->_idle_time)) == std::cv_status::timeout) {
+              if (executor->_n_existing_workers > executor->_low_watermark) {
+                  executor->_n_free_workers--;
+                  executor->_n_existing_workers--;
+                  return;
+                }
+              else {
+                  executor->empty_condition.wait (lock);
+                }
+            }
+          executor->_n_free_workers--;
+        }
+      task = executor->tasks.front ();
+      executor->tasks.pop_front ();
+    }
+    task ();
   }
+  std::unique_lock<std::mutex> lock (executor->mutex);
+  executor->_n_existing_workers--;
+  if (executor->_n_existing_workers == 0)
+    executor->stop_condition.notify_one ();
 }
 
 }
