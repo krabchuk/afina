@@ -55,14 +55,11 @@ private:
     // Thread to run network on
     std::thread _thread;
 
-    unsigned int _workers_size = 0;
-    int _workers_max_size;
+    std::mutex _mutex_sockets;
 
-    std::mutex _mutex_workers;
+    Afina::Concurrency::Executor _executor;
 
-    std::condition_variable _cv_workers;
-
-    Afina::Concurrency::Executor executor;
+    std::vector<int> _sockets;
 
     void ExecuteWork(int client_socket);
 };

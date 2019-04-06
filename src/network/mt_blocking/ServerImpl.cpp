@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <algorithm>
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -38,10 +39,8 @@ ServerImpl::~ServerImpl() {}
 void ServerImpl::Start(uint16_t port, uint32_t n_accept, uint32_t n_workers) {
     _logger = pLogging->select("network");
     _logger->info("Start mt_blocking network service");
-    _logger->info ("Start executor");
-    executor.Start ();
-
-    _workers_max_size = n_workers;
+    _logger->info ("Start _executor");
+    _executor.Start ();
 
     sigset_t sig_mask;
     sigemptyset(&sig_mask);
@@ -83,9 +82,12 @@ void ServerImpl::Start(uint16_t port, uint32_t n_accept, uint32_t n_workers) {
 
 // See Server.h
 void ServerImpl::Stop() {
-    executor.Stop ();
+    _executor.Stop ();
     running.store(false);
     shutdown(_server_socket, SHUT_RDWR);
+    std::lock_guard<std::mutex> _lock (_mutex_sockets);
+    for (auto &socket: _sockets)
+        shutdown(socket, SHUT_RDWR);
 }
 
 // See Server.h
@@ -139,10 +141,14 @@ void ServerImpl::OnRun() {
         }
 
 
-        if (!executor.Execute (&ServerImpl::ExecuteWork, this, client_socket)) {
-            static const std::string msg = "Server too busy";
-            if (send(client_socket, msg.data(), msg.size(), 0) <= 0) {
-                _logger->error ("Failed to write response to client: {}", strerror (errno));
+        {
+            std::lock_guard<std::mutex> _lock (_mutex_sockets);
+            _sockets.push_back(client_socket);
+            if (!_executor.Execute (&ServerImpl::ExecuteWork, this, client_socket)) {
+                static const std::string msg = "Server too busy";
+                if (send(client_socket, msg.data(), msg.size(), 0) <= 0) {
+                    _logger->error ("Failed to write response to client: {}", strerror (errno));
+                }
             }
         }
     }
@@ -236,10 +242,8 @@ void ServerImpl::ExecuteWork(int client_socket) {
 
     close(client_socket);
 
-    std::lock_guard<std::mutex> _lock (_mutex_workers);
-    _workers_size--;
-    if (_workers_size == 0 && !running.load())
-        _cv_workers.notify_all();
+    std::lock_guard<std::mutex> _lock (_mutex_sockets);
+    _sockets.erase(std::find(_sockets.begin(), _sockets.end(), client_socket));
 }
 
 } // namespace MTblocking
