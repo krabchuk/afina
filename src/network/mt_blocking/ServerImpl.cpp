@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <algorithm>
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -82,10 +83,9 @@ void ServerImpl::Start(uint16_t port, uint32_t n_accept, uint32_t n_workers) {
 void ServerImpl::Stop() {
     running.store(false);
     shutdown(_server_socket, SHUT_RDWR);
-    while (!_sockets.empty()) {
+    std::lock_guard<std::mutex> _lock (_mutex_workers);
+    for (auto &socket : _sockets)
         shutdown(_sockets.back(), SHUT_RDWR);
-        _sockets.pop_back();
-    }
 }
 
 // See Server.h
@@ -221,7 +221,7 @@ void ServerImpl::ExecuteWork(int client_socket) {
                     readed_bytes -= to_read;
                 }
 
-                // Thre is command & argument - RUN!
+                // There is command & argument - RUN!
                 if (command_to_execute && arg_remains == 0) {
                     _logger->debug("Start command execution");
 
@@ -254,6 +254,7 @@ void ServerImpl::ExecuteWork(int client_socket) {
     close(client_socket);
 
     std::lock_guard<std::mutex> _lock (_mutex_workers);
+    _sockets.erase(std::find(_sockets.begin(), _sockets.end(), client_socket));
     _workers_size--;
     if (_workers_size == 0 && !running.load())
         _cv_workers.notify_all();
