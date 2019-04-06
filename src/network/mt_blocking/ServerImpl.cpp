@@ -149,6 +149,7 @@ void ServerImpl::OnRun() {
                 if (send(client_socket, msg.data(), msg.size(), 0) <= 0) {
                     _logger->error ("Failed to write response to client: {}", strerror (errno));
                 }
+                _sockets.erase(std::find(_sockets.begin(), _sockets.end(), client_socket));
             }
         }
     }
