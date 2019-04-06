@@ -61,6 +61,8 @@ private:
 
     std::condition_variable _cv_workers;
 
+    std::vector<unsigned int> _sockets;
+
     void ExecuteWork(int client_socket);
 };
 

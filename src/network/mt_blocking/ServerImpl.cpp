@@ -82,6 +82,10 @@ void ServerImpl::Start(uint16_t port, uint32_t n_accept, uint32_t n_workers) {
 void ServerImpl::Stop() {
     running.store(false);
     shutdown(_server_socket, SHUT_RDWR);
+    while (!_sockets.empty()) {
+        shutdown(_sockets.back(), SHUT_RDWR);
+        _sockets.pop_back();
+    }
 }
 
 // See Server.h
@@ -145,6 +149,7 @@ void ServerImpl::OnRun() {
             }
             else {
                 _workers_size++;
+                _sockets.push_back(client_socket);
                 std::thread tmp (&ServerImpl::ExecuteWork, this, client_socket);
                 tmp.detach();
             }
