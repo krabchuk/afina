@@ -44,7 +44,7 @@ public:
     bool Delete(const std::string &key) override;
 
     // Implements Afina::Storage interface
-    bool Get(const std::string &key, std::string &value) override;
+    bool Get(const std::string &key, std::string &value) const override;
 
 private:
   struct lru_node {
@@ -76,7 +76,16 @@ private:
   mutable std::unique_ptr<lru_node> _lru_head;
   mutable lru_node *_lru_tail = nullptr;
 
+  using iterator_class = std::unordered_map<std::reference_wrapper<const std::string>,
+      std::reference_wrapper<lru_node>,
+      std::hash<std::string>,
+      std::equal_to<const std::string>>::iterator;
+
   bool PutItem(const std::string &key, const std::string &value);
+  bool SetItem(const std::string &key, const std::string &value,
+               iterator_class &item);
+
+  bool DeleteItem(iterator_class &item);
 };
 
 } // namespace Backend

@@ -38,10 +38,43 @@ bool SimpleLRU::PutItem(const std::string &key, const std::string &value) {
   return true;
 }
 
+bool SimpleLRU::SetItem(const std::string &key, const std::string &value,
+                        iterator_class &item) {
+    if (key.size() + value.size() > _max_size)
+        return false;
+
+    auto &i = item->second.get();
+
+    // Update LRU structure
+    if (_lru_head->_key != key) {
+        if (_lru_tail->_key == key) {
+            _lru_tail->_next = std::move(_lru_head);
+            _lru_head = std::move(_lru_tail->_prev->_next);
+            _lru_tail = _lru_tail->_next.get();
+        } else {
+            std::unique_ptr<lru_node> tmp =  std::move(i._next);
+            _lru_head->_prev = i._prev->_next.get();
+            i._next = std::move(_lru_head);
+            _lru_head = std::move(i._prev->_next);
+            tmp->_prev = _lru_head->_prev;
+            _lru_head->_prev->_next = std::move(tmp);
+        }
+    }
+
+    _actual_size = _actual_size - _lru_head->_value.size() + value.size();
+    while (_actual_size > _max_size) {
+        Delete(_lru_tail->_key);
+    }
+
+    _lru_head->_value.assign(value);
+    return true;
+}
+
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::Put(const std::string &key, const std::string &value) {
-    if (_lru_index.find(key) != _lru_index.end())
-      return Set(key, value);
+    auto item = _lru_index.find(key);
+    if (item != _lru_index.end())
+      return SetItem(key, value, item);
 
     return PutItem(key, value);
 }
@@ -60,44 +93,39 @@ bool SimpleLRU::Set(const std::string &key, const std::string &value) {
   if (item == _lru_index.end())
     return false;
 
-  if (_actual_size - item->second.get()._value.size() + value.size() > _max_size)
-    return false;
-
-  _actual_size = _actual_size - item->second.get()._value.size() + value.size();
-  item->second.get()._value.assign(value);
-  return true;
+  return SetItem(key, value, item);
 }
 
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::Delete(const std::string &key) {
-  auto item = _lru_index.find(key);
-  if (item == _lru_index.end())
-    return false;
+    auto item = _lru_index.find(key);
+    if (item == _lru_index.end())
+        return false;
 
-  _actual_size = _actual_size - key.size() - item->second.get()._value.size();
-  auto &curr = item->second.get()._prev ? item->second.get()._prev->_next : _lru_head;
-  if (curr->_next) {
-    curr->_next->_prev = curr->_prev;
-    if (curr->_prev) {
-      curr->_prev->_next = std::move(curr->_next);
+    _actual_size = _actual_size - key.size() - item->second.get()._value.size();
+    auto &curr = item->second.get()._prev ? item->second.get()._prev->_next : _lru_head;
+    if (curr->_next) {
+        curr->_next->_prev = curr->_prev;
+        if (curr->_prev) {
+            curr->_prev->_next = std::move(curr->_next);
+        }
+        else {
+            _lru_head = std::move(curr->_next);
+        }
     }
     else {
-      _lru_head = std::move(curr->_next);
+        lru_node *_tail_prev = _lru_tail->_prev;
+        if (_tail_prev) {
+            _lru_tail->_prev->_next.reset();
+        }
+        else {
+            _lru_head.reset();
+        }
+        _lru_tail = _tail_prev;
     }
-  }
-  else {
-    lru_node *_tail_prev = _lru_tail->_prev;
-    if (_tail_prev) {
-      _lru_tail->_prev->_next.reset();
-    }
-    else {
-      _lru_head.reset();
-    }
-    _lru_tail = _tail_prev;
-  }
 
-  _lru_index.erase(item);
-  return true;
+    _lru_index.erase(item);
+    return true;
 }
 
 // See MapBasedGlobalLockImpl.h
