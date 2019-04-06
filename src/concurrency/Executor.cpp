@@ -33,11 +33,12 @@ void Executor::Stop (bool await) {
 void perform(Afina::Concurrency::Executor *executor) {
   while (executor->state == Executor::State::kRun) {
     std::function<void()> task;
+    auto time_until = std::chrono::system_clock::now() + std::chrono::milliseconds(executor->_idle_time);
     {
       std::unique_lock<std::mutex> lock (executor->mutex);
       while (executor->state == Executor::State ::kRun && executor->tasks.empty ()) {
           executor->_n_free_workers++;
-          if (executor->empty_condition.wait_for (lock, std::chrono::milliseconds(executor->_idle_time)) == std::cv_status::timeout) {
+          if (executor->empty_condition.wait_until (lock, time_until) == std::cv_status::timeout) {
               if (executor->_n_existing_workers > executor->_low_watermark) {
                   executor->_n_free_workers--;
                   executor->_n_existing_workers--;
