@@ -48,9 +48,11 @@ bool SimpleLRU::SetItem(const std::string &key, const std::string &value,
     // Update LRU structure
     if (_lru_head->_key != key) {
         if (_lru_tail->_key == key) {
+            _lru_head->_prev = _lru_tail;
             _lru_tail->_next = std::move(_lru_head);
             _lru_head = std::move(_lru_tail->_prev->_next);
             _lru_tail = _lru_tail->_next.get();
+            _lru_head->_prev = nullptr;
         } else {
             std::unique_ptr<lru_node> tmp =  std::move(i._next);
             _lru_head->_prev = i._prev->_next.get();
