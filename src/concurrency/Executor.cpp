@@ -36,6 +36,7 @@ void perform(Afina::Concurrency::Executor *executor) {
     auto time_until = std::chrono::system_clock::now() + std::chrono::milliseconds(executor->_idle_time);
     {
       std::unique_lock<std::mutex> lock (executor->mutex);
+      lock.lock();
       while (executor->state == Executor::State ::kRun && executor->tasks.empty ()) {
           executor->_n_free_workers++;
           if (executor->empty_condition.wait_until (lock, time_until) == std::cv_status::timeout) {
